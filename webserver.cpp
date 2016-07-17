@@ -12,6 +12,7 @@
 #include <cstdio>
 
 volatile bool g_web_server_stop = false;
+
 const int MAX_EVENTS = 32;
 
 int set_nonblock(int fd) {
@@ -27,17 +28,12 @@ int set_nonblock(int fd) {
 #endif
 }
 
-int web_server_run(const options &ws_opts) {
+int create_master_socket(const sockaddr_in &master_addr) {
     int master_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (master_fd < 0) {
         perror("Error: ");
         return -1;
     }
-
-    sockaddr_in master_addr;
-    master_addr.sin_family = AF_INET;
-    master_addr.sin_addr = ws_opts.server_ip;
-    master_addr.sin_port = ws_opts.server_port;
 
     if (bind(master_fd, reinterpret_cast<sockaddr *>(&master_addr), sizeof(master_addr)) < 0) {
         perror("Error: ");
@@ -46,6 +42,20 @@ int web_server_run(const options &ws_opts) {
 
     set_nonblock(master_fd);
     listen(master_fd, SOMAXCONN);
+    return master_fd;
+}
+
+int web_server_run(const options &ws_opts) {
+
+    sockaddr_in master_addr;
+    master_addr.sin_family = AF_INET;
+    master_addr.sin_addr = ws_opts.server_ip;
+    master_addr.sin_port = ws_opts.server_port;
+
+    int master_fd = create_master_socket(master_addr);
+    if (master_fd < 0) {
+        return -1;
+    }
 
     int epl = epoll_create1(0);
     epoll_event ev;

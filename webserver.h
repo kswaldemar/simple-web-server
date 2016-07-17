@@ -14,4 +14,6 @@ extern volatile bool g_web_server_stop;
 
 int web_server_run(const options &ws_opts);
 
+int serve_socket(int sock_fd);
+
 #endif //SIMPLE_WEB_SERVER_WEBSERVER_H

@@ -12,7 +12,9 @@
 
 struct options {
     char server_root[OPTION_MAX_LEN];
+    //In network byte order
     in_addr server_ip;
+    //In network byte order
     uint16_t server_port;
     uint16_t workers_count = 4;
     bool daemonize = true;

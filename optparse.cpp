@@ -36,6 +36,7 @@ int parse_args(int argc, char **argv, options &opts) {
                     fprintf(stderr, "Error: '%s' is not valid port value\n", optarg);
                     return -2;
                 }
+                opts.server_port = htons(opts.server_port);
                 required_opt |= 0x4;
                 break;
             case 's':

@@ -9,6 +9,9 @@
 
 #include <cstdint>
 
+//True if we should stop right now
+extern volatile bool g_web_server_stop;
+
 int web_server_run(const options &ws_opts);
 
 #endif //SIMPLE_WEB_SERVER_WEBSERVER_H

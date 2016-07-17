@@ -4,14 +4,15 @@
 
 #include "webserver.h"
 
-#include <thread>
-
 #include <fcntl.h>
 #include <unistd.h>
-#include <set>
-#include <algorithm>
+#include <sys/epoll.h>
+
+#include <cerrno>
+#include <cstdio>
 
 volatile bool g_web_server_stop = false;
+const int MAX_EVENTS = 32;
 
 int set_nonblock(int fd) {
     int flags;
@@ -43,55 +44,45 @@ int web_server_run(const options &ws_opts) {
         return -2;
     }
 
-    std::set<int> conn_socks;
-
     set_nonblock(master_fd);
-
     listen(master_fd, SOMAXCONN);
 
+    int epl = epoll_create1(0);
+    epoll_event ev;
+    ev.data.fd = master_fd;
+    ev.events = EPOLLIN;
+    epoll_ctl(epl, EPOLL_CTL_ADD, master_fd, &ev);
+
+    epoll_event evnts[MAX_EVENTS];
+
     while (!g_web_server_stop) {
-        fd_set sock_set;
-        FD_ZERO(&sock_set);
-        FD_SET(master_fd, &sock_set);
+        int evcnt = epoll_wait(epl, evnts, MAX_EVENTS, -1);
+        for (int i = 0; (!g_web_server_stop) && i < evcnt; ++i) {
+            if (evnts[i].data.fd == master_fd) {
+                int sock = accept(master_fd, nullptr, nullptr);
+                set_nonblock(sock);
+                ev.data.fd = sock;
+                ev.events = EPOLLIN;
+                epoll_ctl(epl, EPOLL_CTL_ADD, sock, &ev);
+                continue;
+            }
 
-        for (auto &sck : conn_socks) {
-            FD_SET(sck, &sock_set);
-        }
-
-        int max_fd = std::max(master_fd, *std::max_element(conn_socks.begin(), conn_socks.end()));
-        select(max_fd + 1, &sock_set, nullptr, nullptr, nullptr);
-
-        if (g_web_server_stop) {
-            break;
-        }
-
-        for (auto &sck : conn_socks) {
-            if (FD_ISSET(sck, &sock_set)) {
-                //Information to one of served socket passed
-                if (serve_socket(sck) < 0) {
-                    conn_socks.erase(sck);
-                }
-
+            if ((evnts[i].events & EPOLLERR) || (evnts[i].events & EPOLLHUP)) {
+                epoll_ctl(epl, EPOLL_CTL_DEL, evnts[i].data.fd, nullptr);
+                shutdown(evnts[i].data.fd, SHUT_RDWR);
+                close(evnts[i].data.fd);
+            } else if (evnts[i].events & EPOLLIN) {
                 /*
                  * To be multithreaded:
                  * Add to serving socket queue
                  * Notify all threads
                  */
+                serve_socket(evnts[i].data.fd);
             }
         }
-        if (FD_ISSET(master_fd, &sock_set)) {
-            int sock = accept(master_fd, nullptr, nullptr);
-            set_nonblock(sock);
-            conn_socks.insert(sock);
-        }
-
     }
 
     printf("Info: Release resources\n");
-    for (auto &sck : conn_socks) {
-        shutdown(sck, SHUT_RDWR);
-        close(sck);
-    }
     return 0;
 }
 
@@ -105,7 +96,10 @@ int serve_socket(int sock_fd) {
         return -1;
     } else if (nbytes > 0) {
         //Here parse http and create response
-        printf("Info: Message '%.100s...'\n", buf);
+        //printf("Info: Message '%.100s...'\n", buf);
+
+        //Echo server
+        send(sock_fd, buf, static_cast<size_t>(nbytes), 0);
     }
     return 0;
 }

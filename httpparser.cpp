@@ -31,9 +31,9 @@ int parse_request(char *msg, http_response_msg &response, const char *webserv_ro
     FILE *file = fopen(filepath.c_str(), "r");
     response.req_file = file;
 
-    printf("Info: Http=%s, Method=%s, URI=%s, File=%s\n",
-           http_ver.c_str(), method.c_str(), filepath.c_str(),
-           file ? "Exists" : "Not found");
+    //printf("Info: Http=%s, Method=%s, URI=%s, File=%s\n",
+    //       http_ver.c_str(), method.c_str(), filepath.c_str(),
+    //       file ? "Exists" : "Not found");
 
     response.status_line = http_ver;
     response.status_line += " ";

@@ -178,6 +178,9 @@ int serve_socket(int sock_fd, const char *webserver_root) {
         http_response_msg rsp;
         parse_request(buf, rsp, webserver_root);
         write_response(sock_fd, rsp);
+
+        shutdown(sock_fd, SHUT_RDWR);
+        close(sock_fd);
     }
     return 0;
 }
@@ -208,6 +211,7 @@ int write_response(int socket_fd, const http_response_msg &msg) {
         while (sz > 0) {
             if (send(socket_fd, buf, sz, 0) < 0) {
                 perror("Send file failed: ");
+                fclose(msg.req_file);
                 return -2;
             }
             sz = fread(buf, 1, sizeof(buf), msg.req_file);

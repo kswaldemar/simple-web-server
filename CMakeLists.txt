@@ -11,3 +11,4 @@ add_executable(final
     optparse.cpp
     httpparser.cpp
     webserver.cpp)
+target_link_libraries(final pthread)

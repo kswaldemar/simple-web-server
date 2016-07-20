@@ -5,6 +5,9 @@
 #include <unistd.h>
 #include <signal.h>
 #include <memory.h>
+#include <pthread.h>
+
+extern pthread_cond_t g_condvar;
 
 int main(int argc, char **argv) {
     int ret = 0;
@@ -32,6 +35,7 @@ int main(int argc, char **argv) {
         printf("Info: Got signal %s\n", strsignal(signo));
         printf("Info: Trying to exit\n");
         g_web_server_stop = true;
+        pthread_cond_broadcast(&g_condvar);
     };
     act.sa_mask = term_signals;
     sigaction(SIGINT, &act, nullptr);

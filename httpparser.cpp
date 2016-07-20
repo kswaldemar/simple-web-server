@@ -16,6 +16,12 @@ int parse_request(char *msg, http_response_msg &response, const char *webserv_ro
     std::string filepath = webserv_root_dir;
     filepath += strtok(nullptr, " ");
 
+    //Get params support
+    unsigned long idx = filepath.find('?');
+    if (idx != std::string::npos) {
+        filepath[idx] = '\0';
+    }
+
     std::string http_ver = strtok(nullptr, "\n");
     http_ver.pop_back();
     if (http_ver.back() == '\r') {

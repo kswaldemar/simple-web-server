@@ -6,4 +6,8 @@ add_compile_options(
     -std=c++11
 )
 
-add_executable(final main.cpp optparse.cpp webserver.cpp)
+add_executable(final
+    main.cpp
+    optparse.cpp
+    httpparser.cpp
+    webserver.cpp)

@@ -3,13 +3,13 @@
 //
 
 #include "webserver.h"
+#include "httpparser.h"
 
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/epoll.h>
 
-#include <cerrno>
-#include <cstdio>
+#include <cstring>
 
 volatile bool g_web_server_stop = false;
 
@@ -35,7 +35,7 @@ int create_master_socket(const sockaddr_in &master_addr) {
         return -1;
     }
 
-    if (bind(master_fd, reinterpret_cast<sockaddr *>(&master_addr), sizeof(master_addr)) < 0) {
+    if (bind(master_fd, reinterpret_cast<const sockaddr *>(&master_addr), sizeof(master_addr)) < 0) {
         perror("Error: ");
         return -2;
     }
@@ -87,7 +87,7 @@ int web_server_run(const options &ws_opts) {
                  * Add to serving socket queue
                  * Notify all threads
                  */
-                serve_socket(evnts[i].data.fd);
+                serve_socket(evnts[i].data.fd, ws_opts.server_root);
             }
         }
     }
@@ -97,7 +97,7 @@ int web_server_run(const options &ws_opts) {
 }
 
 
-int serve_socket(int sock_fd) {
+int serve_socket(int sock_fd, const char *webserver_root) {
     char buf[4096];
     ssize_t nbytes = recv(sock_fd, &buf, 4096, 0);
     if ((nbytes <= 0) && (errno != EAGAIN)) {
@@ -105,11 +105,44 @@ int serve_socket(int sock_fd) {
         close(sock_fd);
         return -1;
     } else if (nbytes > 0) {
-        //Here parse http and create response
-        //printf("Info: Message '%.100s...'\n", buf);
+        http_response_msg rsp;
+        parse_request(buf, rsp, webserver_root);
+        write_response(sock_fd, rsp);
+    }
+    return 0;
+}
 
-        //Echo server
-        send(sock_fd, buf, static_cast<size_t>(nbytes), 0);
+int write_response(int socket_fd, const http_response_msg &msg) {
+    std::string tosend;
+    std::string line_ending = "\r\n";
+
+    tosend += msg.status_line;
+    tosend += line_ending;
+    for (const auto &header : msg.headers) {
+        tosend += header;
+        tosend += line_ending;
+    }
+
+    tosend += line_ending;
+
+    if (send(socket_fd, tosend.c_str(), tosend.size(), 0) < 0) {
+        perror("Cannot send to socket in write_response: ");
+        return -1;
+    }
+
+    if (msg.req_file) {
+        rewind(msg.req_file);
+
+        uint8_t buf[1024];
+        int sz = fread(buf, 1, sizeof(buf), msg.req_file);
+        while (sz > 0) {
+            if (send(socket_fd, buf, sz, 0) < 0) {
+                perror("Send file failed: ");
+                return -2;
+            }
+            sz = fread(buf, 1, sizeof(buf), msg.req_file);
+        }
+        fclose(msg.req_file);
     }
     return 0;
 }
